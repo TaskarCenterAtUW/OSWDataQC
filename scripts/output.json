@@ -1,0 +1,211 @@
+[
+    {'id': 6468755, 'tag': {'alt_name': 'J. P. Patches Place', 'bicycle': 'designated', 'cycleway': 'track', 'highway': 'tertiary', 'lanes': '2', 'lcn': 'yes', 'maxheight': 'default', 'maxspeed': '25 mph', 'name': 'North 34th Street', 'old_name': 'Ewing Ave / St', 'sidewalk': 'separate', 'surface': 'asphalt', 'tiger:cfcc': 'A41', 'tiger:county': 'King, WA', 'tiger:name_base': '34th', 'tiger:name_direction_prefix': 'N', 'tiger:name_type': 'St'
+        }, 'nd': [
+            624880921,
+            2672452086,
+            6292303573,
+            5104281106
+        ]
+    },
+    {'id': 41500688, 'tag': {'bicycle': 'designated', 'bridge': 'yes', 'footway': 'sidewalk', 'highway': 'footway', 'layer': '1', 'lit': 'yes', 
+'name': 'Cheshiahud Lake Union Loop', 'seamark:bridge:category': 'bascule', 'seamark:type': 'bridge', 'segregated': 'no', 'surface': 'concrete', 'width': '2.5'
+        }, 'nd': [
+            508037643,
+            508037645,
+            508037651,
+            508037748,
+            8726274523,
+            3221153507,
+            3743412479,
+            3221153506
+        ]
+    },
+    {'id': 49232844, 'tag': {'area': 'yes', 'highway': 'footway', 'lit': 'yes', 'surface': 'concrete'
+        }, 'nd': [
+            624880914,
+            6292303553,
+            6292303554,
+            3221153498,
+            624880917,
+            3221153499,
+            624880916,
+            6292303551,
+            6292303552,
+            624880923,
+            3221153501,
+            624880914
+        ]
+    },
+    {'id': 49891952, 'tag': {'alt_name': 'J.P. Patches Place', 'bicycle': 'designated', 'cycleway:left': 'lane', 'cycleway:right': 'track', 'highway': 'tertiary', 'lanes': '3', 'lcn': 'yes', 'maxspeed': '25 mph', 'name': 'North 34th Street', 
+'old_name': 'Ewing Ave / St', 'oneway': 'yes', 'oneway:bicycle': 'no', 'sidewalk': 'separate', 'surface': 'asphalt', 'tiger:cfcc': 'A41', 'tiger:county': 'King, WA', 'tiger:name_base': '34th', 'tiger:name_direction_prefix': 'N', 'tiger:name_type': 'St', 'turn:lanes': 'left|left|through;right'
+        }, 'nd': [
+            624880921,
+            3177919972,
+            2128595818
+        ]
+    },
+    {'id': 191290472, 'tag': {'bicycle': 'designated', 'footway': 'sidewalk', 'highway': 'footway', 'lit': 'yes', 'name': 'Cheshiahud Lake Union Loop', 'segregated': 'no', 'surface': 'concrete', 'width': '2.5'
+        }, 'nd': [
+            3221153506,
+            2018750728,
+            2018750731,
+            3221153502
+        ]
+    },
+    {'id': 261640006, 'tag': {'highway': 
+'footway', 'surface': 'concrete'
+        }, 'nd': [
+            1309604059,
+            2672452081,
+            2672452082,
+            2672452083,
+            2672452084,
+            2672452085,
+            4115155738,
+            2672452086
+        ]
+    },
+    {'id': 311996205, 'tag': {'highway': 'service', 'lanes': '1', 'service': 'parking_aisle'
+        }, 'nd': [
+            3177919971,
+            6292532994,
+            3177919972
+        ]
+    },
+    {'id': 315996957, 'tag': {'crossing': 'marked', 'footway': 'crossing', 'highway': 'footway'
+        }, 'nd': [
+            624880912,
+            3221153499
+        ]
+    },
+    {'id': 315996958, 'tag': {'crossing': 'marked', 'footway': 'crossing', 'highway': 'footway'
+        }, 'nd': [
+            6292303556,
+            2128595833,
+            3221153498
+        ]
+    },
+    {'id': 315996959, 'tag': {'footway': 'sidewalk', 'highway': 'footway', 'lit': 'yes', 'surface': 'concrete'
+        }, 'nd': [
+            4291026706,
+            3221153501
+        ]
+    },
+    {'id': 315996960, 'tag': {'cycleway:right': 'lane', 'cycleway:right:buffer': 'yes', 'cycleway:right:lane': 'exclusive', 'highway': 'secondary_link', 'lanes': '1', 'lit': 'yes', 'maxspeed': '25 mph', 'oneway': 'yes', 'parking:lane:both': 'no_stopping', 'sidewalk': 'separate', 'surface': 'concrete'
+        }, 'nd': [
+            1689832886,
+            3221153503,
+            1689832857,
+            624880912
+        ]
+    },
+    {'id': 315996961, 'tag': {'bridge': 'yes', 'cycleway:right': 'lane', 'destination:street': 'North 34th Street', 'highway': 'secondary_link', 'lanes': '1', 'layer': '1', 'maxspeed': '25 mph', 'oneway': 'yes', 'parking:lane:both': 'no_stopping', 'sidewalk': 'separate', 'surface': 'asphalt'
+        }, 'nd': [
+            3221153504,
+            3221153505,
+            1689832886
+        ]
+    },
+    {'id': 323749013, 'tag': {'cycleway:right': 'lane', 'cycleway:right:buffer': 'yes', 'highway': 'secondary_link', 'lanes': '1', 'maxspeed': '25 mph', 'oneway': 'yes', 'parking:lane:both': 'no_stopping', 'sidewalk': 'separate', 'surface': 'asphalt'
+        }, 'nd': [
+            624880912,
+            624880910,
+            624880909,
+            1689832839,
+            624880921
+        ]
+    },
+    {'id': 409619876, 'tag': {'footway': 'sidewalk', 'highway': 'footway', 'surface': 'concrete'
+        }, 'nd': [
+            1752970051,
+            6292266872,
+            4115155727,
+            4115155733,
+            4115155728,
+            4115155730,
+            4115155729,
+            4141611491,
+            6292303576,
+            4115155738,
+            4115155739,
+            4291026707,
+            4115155741,
+            3221153502
+        ]
+    },
+    {'id': 671941961, 'tag': {'crossing': 'marked', 'footway': 'crossing', 'highway': 'footway'
+        }, 'nd': [
+            6292303549,
+            2128595818,
+            3221153501
+        ]
+    },
+    {'id': 671941964, 'tag': {'bicycle': 'yes', 'crossing': 'marked', 'footway': 'crossing', 'highway': 'footway', 'segregated': 'no'
+        }, 'nd': [
+            6292303550,
+            624880912
+        ]
+    },
+    {'id': 671941966, 'tag': {'highway': 'footway', 'surface': 'concrete'
+        }, 'nd': [
+            3221153502,
+            6292303550
+        ]
+    },
+    {'id': 671941968, 'tag': {'footway': 'sidewalk', 'highway': 'footway', 'lit': 'yes', 'surface': 'concrete'
+        }, 'nd': [
+            3221153499,
+            4291026706
+        ]
+    },
+    {'id': 671941969, 'tag': {'footway': 'sidewalk', 'highway': 'footway', 'lit': 'yes', 'surface': 'concrete'
+        }, 'nd': [
+            3221153498,
+            4291026706
+        ]
+    },
+    {'id': 671941988, 'tag': {'footway': 'crossing', 'highway': 'footway'
+        }, 'nd': [
+            6292303572,
+            6808130520,
+            6292538293,
+            6292303571
+        ]
+    },
+    {'id': 671941993, 'tag': {'highway': 'footway'
+        }, 'nd': [
+            6292303575,
+            6292303578,
+            6292303572
+        ]
+    },
+    {'id': 671941994, 'tag': {'crossing': 'marked', 'footway': 'crossing', 'highway': 'footway'
+        }, 'nd': [
+            6292303574,
+            6292303573,
+            6292303575
+        ]
+    },
+    {'id': 671941996, 'tag': {'footway': 'sidewalk', 'highway': 'footway'
+        }, 'nd': [
+            6558606627,
+            6558606626,
+            6558606628,
+            6558606625,
+            6558606624,
+            6558606623,
+            6558606622,
+            6558606629,
+            6292303579,
+            6292303578,
+            6292532994,
+            6292303577,
+            6292303567,
+            6292303566,
+            6292303565,
+            6292399796,
+            4964446296,
+            6292399795
+        ]
+    }
+]
