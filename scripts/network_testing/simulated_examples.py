@@ -31,6 +31,8 @@ cases = {
     }
 }
 
+FOLDER_LOCATION = "case_"
+
 def create_graph(case_number):
     G=nx.Graph()
     for node_number, node_coordinates in cases[case_number]["nodes"].items():
@@ -38,7 +40,7 @@ def create_graph(case_number):
     for edge in cases[case_number]["edges"]:
         G.add_edge(edge[0], edge[1])
     
-    draw_graph(G, f"case_{case_number}/original.png")
+    draw_graph(G, f"{FOLDER_LOCATION}{case_number}/original.png")
     return G
 
 
@@ -55,8 +57,15 @@ def get_calculations():
             "node_stats": node_stats
         }
         #save lists to csv
-        save_csv(edge_stats, f"case_{case_number}/edge_{case_number}.csv")
-        save_csv(node_stats, f"case_{case_number}/node_{case_number}.csv")
+        original_stats = get_centrality(G)
+        original_stats["broken"] = "none"
+        original_stats["is_broken"] = 0
+        original_stats["type"] = "original"
+        overall_stats = edge_stats + node_stats
+        overall_stats.append(original_stats)
+        save_csv(edge_stats, f"{FOLDER_LOCATION}{case_number}/edge_stats.csv")
+        save_csv(node_stats, f"{FOLDER_LOCATION}{case_number}/node_stats.csv")
+        save_csv(overall_stats, f"{FOLDER_LOCATION}{case_number}/overall_stats.csv")
 
 def save_csv(list_of_dict,filename):
     with open(filename, 'w') as csvfile: 
@@ -66,15 +75,15 @@ def save_csv(list_of_dict,filename):
             csvwriter.writerow(row.values())
 
 def edge_calculations(case, G, case_number):
-    original_centrality_stats = get_centrality(G)
-    original_centrality_stats["broken_edge"]="none"
-    stats = [original_centrality_stats]
+    stats = []
     for edge in case["edges"]:
         #print(edge)
         node_1,node_2 = break_edge(edge, G)
-        draw_graph(G, f"case_{case_number}/broken_edge_{edge}.png")
+        draw_graph(G, f"{FOLDER_LOCATION}{case_number}/broken_edge_{edge}.png")
         edge_stats = get_centrality(G)
-        edge_stats["broken_edge"] = edge
+        edge_stats["broken"] = edge
+        edge_stats["is_broken"] = 1
+        edge_stats["type"] = "edge"
         stats.append(edge_stats)
         # add centrality metrics to list
         connect_edge(G, edge, node_1, node_2)
@@ -127,17 +136,17 @@ def connect_edge(G, edge_tuple, node_1, node_2):
 
 
 def node_calculations(case, G, case_number):
-    original_centrality_stats = get_centrality(G)
-    original_centrality_stats["broken_node"]="none"
-    stats = [original_centrality_stats]
+    stats = []
     for node_number, node in case["nodes"].items():
         edge_list, node_list = break_node(case["edges"], node, node_number, G)
         if len(edge_list) > 1:
             node_stats = get_centrality(G)
-            node_stats["broken_node"] = node_number
+            node_stats["broken"] = node_number
+            node_stats["is_broken"] = 1
+            node_stats["type"] = "node"
             stats.append(node_stats)
-            draw_graph(G, f"case_{case_number}/broken_node_{node_number}.png")
-            draw_graph_without_geo(G, f"case_{case_number}/broken_node_{node_number}_no_geo.png")
+            draw_graph(G, f"{FOLDER_LOCATION}{case_number}/broken_node_{node_number}.png")
+            draw_graph_without_geo(G, f"{FOLDER_LOCATION}{case_number}/broken_node_{node_number}_no_geo.png")
         connect_node(edge_list, node_list, G, node_number, node)
     return stats
 
@@ -177,7 +186,7 @@ def get_centrality(G):
     stats["bet_centrality_avg"] = avg(bet)
     stats["eig_centrality_avg"] = avg(eigen)
     stats["deg_centrality_avg"] = avg(deg)
-    stats["connected"] = nx.is_connected(undirected_g)
+    stats["connected"] = 1 if nx.is_connected(undirected_g) else 0
 
     return stats
 
