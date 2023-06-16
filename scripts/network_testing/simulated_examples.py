@@ -2,6 +2,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import csv
 import os
+from statistics import mean, stdev
 
 cases = {
     1:
@@ -31,7 +32,7 @@ cases = {
     }
 }
 
-FOLDER_LOCATION = "case_"
+FOLDER_LOCATION = "v4_case_"
 
 def create_graph(case_number):
     G=nx.Graph()
@@ -47,8 +48,8 @@ def create_graph(case_number):
 def get_calculations():
     centrality_stats = {}
     for case_number, case in cases.items():
-        if not os.path.isdir(f"./case_{case_number}"):
-            os.mkdir(f"./case_{case_number}")
+        if not os.path.isdir(f"./{FOLDER_LOCATION}{case_number}"):
+            os.mkdir(f"./{FOLDER_LOCATION}{case_number}")
         G = create_graph(case_number)
         edge_stats = edge_calculations(case, G, case_number)
         node_stats = node_calculations(case, G, case_number)
@@ -183,16 +184,16 @@ def get_centrality(G):
     bet = nx.betweenness_centrality(undirected_g, normalized = True, endpoints=False)
     eigen = nx.eigenvector_centrality(undirected_g, max_iter=2000)
     deg = nx.degree_centrality(undirected_g)
-    stats["bet_centrality_avg"] = avg(bet)
-    stats["eig_centrality_avg"] = avg(eigen)
-    stats["deg_centrality_avg"] = avg(deg)
+    stats["bet_centrality_avg"] = mean(bet.values())
+    stats["eig_centrality_avg"] = mean(eigen.values())
+    stats["deg_centrality_avg"] = mean(deg.values())
+    stats["bet_centrality_stdev"] = stdev(bet.values())
+    stats["eig_centrality_stdev"] = stdev(eigen.values())
+    stats["deg_centrality_stdev"] = stdev(deg.values())
     stats["connected"] = 1 if nx.is_connected(undirected_g) else 0
 
     return stats
 
-def avg(evaluation_dictionary):
-    vals = evaluation_dictionary.values()
-    return sum(vals)/len(vals)
 
 get_calculations()
 
