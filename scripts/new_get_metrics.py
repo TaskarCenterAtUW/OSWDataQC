@@ -9,10 +9,10 @@ from statistics import stdev, mean
 from osmapi import OsmApi
 import geonetworkx as gnx
 from datetime import datetime
+import pandas as pd
 
 DATE = datetime.now() 
 PROJ = 'epsg:26910' 
-TILING_FILEPATH = "C:\\Users\\jessica\\Downloads\\redmond_crossing_tasks.geojson"
 SIDEWALK_FILTER = '["highway"~"footway|steps|living_street|path"]'
 
 USERNAME = ""
@@ -34,8 +34,12 @@ def get_item_history(item):
     '''Uses the OSM API to get the item history for any given node, way, or relation object.'''
     
     history = {}
-    item_type = item['type']
-    id = item['data']['id']
+    print(item)
+    if 'element_type' in item:
+        item_type = item['element_type']
+    else:
+        return None #TODO change this to be something else
+    id = item.get('osmid')
 
     if item_type == 'node':
         history = OSMAPICONNECTION.NodeHistory(id)
@@ -55,7 +59,9 @@ def func( feature ):
         feature.eigen = measures["eig_centrality_avg"]
         feature.betweenness = measures["bet_centrality_avg"]
         feature.bet_stdev = measures["bet_stdev"]
-        feature.direct_confirmation = measures["direct_confirmation"]
+        feature.direct_trust_score = measures["direct_trust_score"]
+        feature.time_trust_score = measures["time_trust_score"]
+        feature.indirect_values = measures["indirect_values"]
         return feature
 
 def analyze_area(filename, path = 'pwd'):
@@ -67,7 +73,10 @@ def analyze_area(filename, path = 'pwd'):
     gdf['betweenness'] = None
     gdf['eigen'] = None
     gdf['bet_stdev'] = None
-    gdf['direct_confirmation'] = None
+    gdf['direct_confirmations'] = None
+    gdf['direct_trust_score'] = None
+    gdf['time_trust_score'] = None
+    gdf['indirect_values'] = None
     
     df_dask = dask_geopandas.from_geopandas(gdf, npartitions=16)  
     if __name__ == '__main__':
@@ -81,23 +90,125 @@ def analyze_area(filename, path = 'pwd'):
             ('betweenness', 'object'), 
             ('eigen', 'object'),
             ('bet_stdev', 'object'),
-            ('direct_confirmation', 'object')
+            ('direct_confirmations', 'object'),
+            ('direct_trust_score', 'object'),
+            ('time_trust_score', 'object'),
+            ('indirect_values', 'object')
             ]).compute(scheduler='multiprocessing')
-        
-        print("outputting file")
-        
-        output.to_file(os.path.join("C:\\Development\\tdei\\outputs", (filename + '_all_measures.shp')))
 
+        threshhold_values = get_threshhold_values(output)
+        output['indirect_trust_score'] = output.apply(lambda x: indirect_trust_calc(x, threshhold_values), axis=1)
+        output['trust_score'] = output.apply(lambda x: trust_calc(x), axis=1)
+            # get indirect trust of each tile based on threshhold values
+
+        
+        output.to_file(os.path.join("C:\\Users\\jessb\\OneDrive\\Email attachments\\Documents\\wokr\\redmond", (filename + '_all_measures_new.shp')))
+
+def indirect_trust_calc(feature, threshholds):
+    indirect_trust_score = 0
+    item_name_array = ['road_time', 'road_users', 'road_time', 'poi_count', 'poi_users', 'poi_time', 'bldg_count', 'bldg_count', 'bldg_users', 'bldg_time']
+    for item_name in item_name_array:
+        if feature.indirect_values != None and feature.indirect_values[item_name] != None and feature.indirect_values[item_name] >= threshholds[item_name]:
+            indirect_trust_score += 1
+        
+    return int(indirect_trust_score > 2)
+
+def trust_calc(feature):
+    return (feature.direct_trust_score*.5) + (feature.indirect_trust_score*.25) + (feature.time_trust_score*.25)
+
+def get_threshhold_values(gdf):
+        gdf2 = pd.json_normalize(gdf['indirect_values'])
+        threshholds = {
+            "poi_count": gdf2['poi_count'].mean(),
+            "bldg_count": gdf2['bldg_count'].mean(),
+            "road_count": gdf2['road_count'].mean(),
+            "poi_users": gdf2['poi_users'].mean(),
+            "road_users": gdf2['road_users'].mean(),
+            "bldg_users": gdf2['bldg_users'].mean(),
+            "poi_time": gdf2['poi_time'].mean(),
+            "road_time": gdf2['road_time'].mean(),
+            "bldg_time": gdf2['bldg_time'].mean(),
+        }
+        return threshholds
     
 def get_measures_from_polygon(polygon):
     try:
-        G = ox.graph.graph_from_polygon(polygon, custom_filter = '["highway"~"footway|steps"]', truncate_by_edge=True, simplify=False, retain_all=True)
+        G = ox.graph.graph_from_polygon(polygon, custom_filter = SIDEWALK_FILTER, truncate_by_edge=True, simplify=False, retain_all=True)
     except Exception as e:
         print(f"Unexpected {e}, {type(e)} with polygon {polygon} when getting graph")
-        return {"bet_centrality_avg": None,"eig_centrality_avg": None,"deg_centrality_avg": None, "bet_stdev": None, "direct_confirmation": None}
+        return {"bet_centrality_avg": None,"eig_centrality_avg": None,"deg_centrality_avg": None, "bet_stdev": None, "direct_trust_score": None, "time_trust_score": None, "indirect_values": None}
     stats = get_centrality(G, polygon)
-    stats["direct_confirmation"] = analyze_sidewalk_data(G)
+    
+    direct_trust_score, time_trust_score = analyze_sidewalk_data(G)
+    stats["direct_trust_score"] = direct_trust_score
+    stats["time_trust_score"] = time_trust_score
+
+    stats['indirect_values'] = get_indirect_trust_score_from_polygon(polygon)
+
+
+
+    
     return stats
+
+def get_indirect_trust_score_from_polygon(polygon):
+    try:
+        gdf_pois = ox.features.features_from_polygon(polygon, tags = {'amenity': True}).to_crs({'init': PROJ})
+    except Exception as e:
+        print(f"Unexpected {e}, {type(e)} with polygon {polygon} when getting graph")
+        gdf_pois = gpd.GeoDataFrame(columns=['id', 'distance', 'feature'], geometry='feature')
+    try:
+        gdf_bldgs = ox.features.features_from_polygon(polygon, tags = {'building': True}).to_crs({'init': PROJ})
+    except Exception as e:
+        print(f"Unexpected {e}, {type(e)} with polygon {polygon} when getting graph")
+        gdf_bldgs = gpd.GeoDataFrame(columns=['id', 'distance', 'feature'], geometry='feature')
+    try:
+        G_roads = ox.graph.graph_from_polygon(polygon, network_type = 'drive', simplify=False, retain_all=True)
+        gdf_roads = gnx.graph_edges_to_gdf(G_roads).to_crs({'init': PROJ})
+    except Exception as e: #TODO make this a better exception
+        print(f"Unexpected {e}, {type(e)} with polygon {polygon} when getting graph")
+        gdf_roads = gpd.GeoDataFrame(columns=['id', 'distance', 'feature'], geometry='feature') #TODO: change column names
+    
+    values_dict = {
+        "poi_count": len(gdf_pois.index),
+        "bldg_count": len(gdf_bldgs.index),
+        "road_count": len(gdf_roads.index),
+        "poi_users": None,
+        "road_users": None,
+        "bldg_users": None,
+        "poi_time": None,
+        "road_time": None,
+        "bldg_time": None,
+    }
+    values_dict["poi_users"], values_dict["poi_time"] = filter_through_items_for_stats(gdf_pois)
+    values_dict["road_users"], values_dict["road_time"] = filter_through_items_for_stats(gdf_roads)
+    values_dict["bldg_users"], values_dict["bldg_time"] = filter_through_items_for_stats(gdf_bldgs)
+
+    return values_dict
+
+def filter_through_items_for_stats(gdf):
+    user_count_array = []
+    days_since_last_edit_array = []
+    mean_user_count_array = 0
+    mean_days_since_last_edit_array = 0
+    for index, row in gdf.iterrows(): 
+        historical_information = get_item_history(row)
+        if not historical_information:
+            user_count, days_since_last_edit = 0, None
+        else:
+            user_count, days_since_last_edit = calculate_feature_stats(historical_information)
+        user_count_array.append(user_count)
+        days_since_last_edit_array.append(days_since_last_edit)
+    if user_count_array and len(user_count_array) != 0:
+        print(user_count_array)
+        mean_user_count_array = mean(user_count_array)
+    if days_since_last_edit_array and len(days_since_last_edit_array) != 0:
+        try:
+            mean_days_since_last_edit_array = mean(days_since_last_edit_array)
+        except Exception as e:
+            mean_days_since_last_edit_array = None
+    return mean_user_count_array, mean_days_since_last_edit_array
+
+
 
 def get_centrality(G, polygon):
     stats = {}
@@ -149,10 +260,10 @@ def analyze_sidewalk_data(G):
         ('days_since_last_edit', 'object'),
         ]).compute(scheduler='multiprocessing')
         
-    G_trust = calculate_total_trust_score(output)
+    direct_trust_score, time_trust_score = calculate_total_trust_score(output)
 
 
-    return G_trust
+    return direct_trust_score, time_trust_score
 
 def get_edge_statistics( feature ):
     historical_edge_information = filter_history_by_date(get_way_history_from_id(feature['osmid']))
@@ -307,7 +418,6 @@ def calculate_total_trust_score(gdf):
     
     gdf_dask['direct_trust_score'] = None
     gdf_dask['time_trust_score'] = None
-    gdf_dask['trust_score'] = None
  
     # calculations for time trust
     days_since_last_edit_threshold = gdf_dask['days_since_last_edit'].mean()
@@ -336,12 +446,12 @@ def calculate_total_trust_score(gdf):
         ('user_count', 'object'),
         ('days_since_last_edit', 'object'),
         ('direct_trust_score', 'object'),
-        ('time_trust_score', 'object'),
-        ('trust_score', 'object')
+        ('time_trust_score', 'object')
         ]).compute(scheduler='multiprocessing')
 
-        trust_score = output['trust_score'].mean()
-        return trust_score
+        direct_trust_score = output['direct_trust_score'].mean()
+        time_trust_score = output['time_trust_score'].mean()
+        return direct_trust_score, time_trust_score
     else:
         print("direct trust calc failed")
         return 0
@@ -365,12 +475,12 @@ def trust_score_calc(feature, versions_threshold, direct_confirm_threshold, chan
     feature.direct_trust_score = direct_trust_score
 
     feature.time_trust_score = int(feature['days_since_last_edit'] > days_since_last_edit_threshold)
-    feature.trust_score = (feature.direct_trust_score*.7) + (feature.time_trust_score*.3)
+    #feature.trust_score = (feature.direct_trust_score*.7) + (feature.time_trust_score*.3)
 
     return feature
 
 
-analyze_area("redmond_new_tiling","C:\\Users\\jessb\\OneDrive\\Email attachments\\Documents\\wokr\\redmond")
+analyze_area("redmond_new_tiling_subset","C:\\Users\\jessb\\OneDrive\\Email attachments\\Documents\\wokr\\redmond")
 #analyze_area("seattle_new_tiling","C:\\Users\\jessica\\Documents\\ArcGIS\\Projects\\MappingSidewalkMetrics")
 #analyze_area("seattle_crossing_tasks", "C:\\Development\\tdei\\OSWDataQC")
 #analyze_area("bellevue_crossing_tasks", "C:\\Development\\tdei\\OSWDataQC")
