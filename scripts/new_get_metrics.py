@@ -102,7 +102,7 @@ def analyze_area(filename, path = 'pwd'):
             # get indirect trust of each tile based on threshhold values
 
         
-        output.to_file(os.path.join("C:\\Users\\jessb\\OneDrive\\Email attachments\\Documents\\wokr\\redmond", (filename + '_all_measures_new.shp')))
+        output.to_file(os.path.join(path, (filename + '_trust_measures.shp')))
 
 def indirect_trust_calc(feature, threshholds):
     indirect_trust_score = 0
@@ -134,7 +134,7 @@ def get_threshhold_values(gdf):
 def get_measures_from_polygon(polygon):
     try:
         G = ox.graph.graph_from_polygon(polygon, custom_filter = SIDEWALK_FILTER, truncate_by_edge=True, simplify=False, retain_all=True)
-    except Exception as e:
+    except ValueError as e:
         print(f"Unexpected {e}, {type(e)} with polygon {polygon} when getting graph")
         return {"bet_centrality_avg": None,"eig_centrality_avg": None,"deg_centrality_avg": None, "bet_stdev": None, "direct_trust_score": None, "time_trust_score": None, "indirect_values": None}
     stats = get_centrality(G, polygon)
@@ -153,18 +153,18 @@ def get_measures_from_polygon(polygon):
 def get_indirect_trust_score_from_polygon(polygon):
     try:
         gdf_pois = ox.features.features_from_polygon(polygon, tags = {'amenity': True}).to_crs({'init': PROJ})
-    except Exception as e:
+    except ValueError as e:
         print(f"Unexpected {e}, {type(e)} with polygon {polygon} when getting graph")
         gdf_pois = gpd.GeoDataFrame(columns=['id', 'distance', 'feature'], geometry='feature')
     try:
         gdf_bldgs = ox.features.features_from_polygon(polygon, tags = {'building': True}).to_crs({'init': PROJ})
-    except Exception as e:
+    except ValueError as e:
         print(f"Unexpected {e}, {type(e)} with polygon {polygon} when getting graph")
         gdf_bldgs = gpd.GeoDataFrame(columns=['id', 'distance', 'feature'], geometry='feature')
     try:
         G_roads = ox.graph.graph_from_polygon(polygon, network_type = 'drive', simplify=False, retain_all=True)
         gdf_roads = gnx.graph_edges_to_gdf(G_roads).to_crs({'init': PROJ})
-    except Exception as e: #TODO make this a better exception
+    except ValueError as e:
         print(f"Unexpected {e}, {type(e)} with polygon {polygon} when getting graph")
         gdf_roads = gpd.GeoDataFrame(columns=['id', 'distance', 'feature'], geometry='feature') #TODO: change column names
     
@@ -204,7 +204,7 @@ def filter_through_items_for_stats(gdf):
     if days_since_last_edit_array and len(days_since_last_edit_array) != 0:
         try:
             mean_days_since_last_edit_array = mean(days_since_last_edit_array)
-        except Exception as e:
+        except TypeError as e:
             mean_days_since_last_edit_array = None
     return mean_user_count_array, mean_days_since_last_edit_array
 
