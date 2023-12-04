@@ -81,8 +81,9 @@ def analyze_area(filename, path = 'pwd'):
     df_dask = dask_geopandas.from_geopandas(gdf, npartitions=16)  
     if __name__ == '__main__':
         output = df_dask.apply(func, axis=1, meta=[
+            ('FID', 'float64'),
             ('OBJECTID', 'int64'),
-            ('Shape_Length', 'float64'),
+            ('Shape_Leng', 'float64'),
             ('Shape_Area','float64'), 
             ('Input_FID','int64'), 
             ('geometry', 'geometry'),
@@ -99,17 +100,17 @@ def analyze_area(filename, path = 'pwd'):
         threshhold_values = get_threshhold_values(output)
         output['indirect_trust_score'] = output.apply(lambda x: indirect_trust_calc(x, threshhold_values), axis=1)
         output['trust_score'] = output.apply(lambda x: trust_calc(x), axis=1)
-            # get indirect trust of each tile based on threshhold values
 
-        
-        output.to_file(os.path.join(path, (filename + '_trust_measures.shp')))
+        final_output = output.drop("indirect_values", axis='columns')
+        final_output.to_file(os.path.join(path, (filename + '_trust_measures.shp')))
 
 def indirect_trust_calc(feature, threshholds):
     indirect_trust_score = 0
-    item_name_array = ['road_time', 'road_users', 'road_time', 'poi_count', 'poi_users', 'poi_time', 'bldg_count', 'bldg_count', 'bldg_users', 'bldg_time']
-    for item_name in item_name_array:
-        if feature.indirect_values != None and feature.indirect_values[item_name] != None and feature.indirect_values[item_name] >= threshholds[item_name]:
-            indirect_trust_score += 1
+    #item_name_array = ['road_time', 'road_users', 'road_time', 'poi_count', 'poi_users', 'poi_time', 'bldg_count', 'bldg_count', 'bldg_users', 'bldg_time']
+    if feature is not None and feature.indirect_values is not None:
+        for key in feature.indirect_values:
+            if feature.indirect_values[key] != None and feature.indirect_values[key] >= threshholds[key]:
+                indirect_trust_score += 1
         
     return int(indirect_trust_score > 2)
 
@@ -144,9 +145,6 @@ def get_measures_from_polygon(polygon):
     stats["time_trust_score"] = time_trust_score
 
     stats['indirect_values'] = get_indirect_trust_score_from_polygon(polygon)
-
-
-
     
     return stats
 
@@ -166,7 +164,7 @@ def get_indirect_trust_score_from_polygon(polygon):
         gdf_roads = gnx.graph_edges_to_gdf(G_roads).to_crs({'init': PROJ})
     except ValueError as e:
         print(f"Unexpected {e}, {type(e)} with polygon {polygon} when getting graph")
-        gdf_roads = gpd.GeoDataFrame(columns=['id', 'distance', 'feature'], geometry='feature') #TODO: change column names
+        gdf_roads = gpd.GeoDataFrame(columns=['u', 'v', 'osmid', 'oneway', 'lanes', 'highway', 'reversed', 'length', 'geometry', 'name'], geometry='geometry') #TODO: change column names for above two
     
     values_dict = {
         "poi_count": len(gdf_pois.index),
@@ -480,7 +478,9 @@ def trust_score_calc(feature, versions_threshold, direct_confirm_threshold, chan
     return feature
 
 
-analyze_area("redmond_new_tiling_subset","C:\\Users\\jessb\\OneDrive\\Email attachments\\Documents\\wokr\\redmond")
+#analyze_area("redmond_new_tiling_subset","C:\\Users\\jessb\\OneDrive\\Email attachments\\Documents\\wokr\\redmond")
+
+analyze_area("seattle_new_ti_FeaturesToJSO", "C:\\Users\\jessb\\OneDrive\\Email attachments\\Documents\\ArcGIS\\Projects\\MyProject")
 #analyze_area("seattle_new_tiling","C:\\Users\\jessica\\Documents\\ArcGIS\\Projects\\MappingSidewalkMetrics")
 #analyze_area("seattle_crossing_tasks", "C:\\Development\\tdei\\OSWDataQC")
 #analyze_area("bellevue_crossing_tasks", "C:\\Development\\tdei\\OSWDataQC")
