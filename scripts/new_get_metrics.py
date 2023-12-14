@@ -11,7 +11,7 @@ import geonetworkx as gnx
 from datetime import datetime
 import pandas as pd
 from shapely.ops import voronoi_diagram
-from shapely import MultiPoint
+from shapely import intersection
 import logging
 
 DATE = datetime.now() 
@@ -63,10 +63,6 @@ def func( feature ):
     poly = feature.geometry
     if (poly.geom_type == "Polygon" or poly.geom_type == "MultiPolygon"):
         measures = get_measures_from_polygon(poly)
-        #feature.degree = measures["deg_centrality_avg"]
-        #feature.eigen = measures["eig_centrality_avg"]
-       # feature.betweenness = measures["bet_centrality_avg"]
-        #feature.bet_stdev = measures["bet_stdev"]
         feature.direct_trust_score = measures["direct_trust_score"]
         feature.time_trust_score = measures["time_trust_score"]
         feature.indirect_values = measures["indirect_values"]
@@ -92,10 +88,6 @@ def analyze_area(filename, path = 'pwd', settings = {}):
         gdf = create_voronoi_diagram(gdf_roads_simplified, gdf.geometry.loc[0])
  
 
-    #gdf['degree'] = None
-    #gdf['betweenness'] = None
-    #gdf['eigen'] = None
-    #gdf['bet_stdev'] = None
     gdf['direct_confirmations'] = None
     gdf['direct_trust_score'] = None
     gdf['time_trust_score'] = None
@@ -107,10 +99,6 @@ def analyze_area(filename, path = 'pwd', settings = {}):
     if __name__ == '__main__':
         output = df_dask.apply(func, axis=1, meta=gpd.GeoDataFrame( {
             'geometry': 'geometry',
-            #'degree':'object',
-            #'betweenness': 'object',
-            #'eigen': 'object',
-            #'bet_stdev': 'object',
             'direct_confirmations': 'object',
             'direct_trust_score': 'object',
             'time_trust_score': 'object',
@@ -122,12 +110,6 @@ def analyze_area(filename, path = 'pwd', settings = {}):
         output['trust_score'] = output.apply(lambda x: trust_calc(x), axis=1)
 
         total_trust_score = output["trust_score"].mean()
-
-        ###remove below
-        final_output = output.drop("indirect_values", axis='columns')
-        final_output.to_file(os.path.join(path, (filename + '_trust_measures.shp')))
-        print(total_trust_score)
-        ###remove above
 
         return total_trust_score
 
@@ -502,7 +484,6 @@ def trust_score_calc(feature, versions_threshold, direct_confirm_threshold, chan
     feature.direct_trust_score = direct_trust_score
 
     feature.time_trust_score = int(feature['days_since_last_edit'] > days_since_last_edit_threshold)
-    #feature.trust_score = (feature.direct_trust_score*.7) + (feature.time_trust_score*.3)
 
     return feature
 
@@ -511,15 +492,11 @@ def create_voronoi_diagram(G_roads_simplified, bounds):
     gdf_roads_simplified = gnx.graph_edges_to_gdf(G_roads_simplified)
     voronoi = voronoi_diagram(gdf_roads_simplified.boundary.unary_union, envelope = bounds)
     voronoi_gdf = gpd.GeoDataFrame({"geometry": voronoi.geoms})
-    #voronoi_gdf.set_crs(PROJ)
-    voronoi_gdf.to_file(os.path.join("C:\\Users\\jessb\\OneDrive\\Email attachments\\Documents\\wokr\\redmond", ('tiling_test2.shp')))
-    return voronoi_gdf
+    voronoi_gdf.set_crs(PROJ)
+    voronoi_gdf_clipped = gpd.clip(voronoi_gdf, bounds)
+    
+    return voronoi_gdf_clipped
 
 
-#analyze_area("redmond_town_center","C:\\Users\\jessb\\OneDrive\\Email attachments\\Documents\\wokr\\redmond")
-analyze_area("seattle_downtown", "C:\\Users\\jessb\\Downloads")
-#analyze_area("seattle_new_tiling","C:\\Users\\jessica\\Documents\\ArcGIS\\Projects\\MappingSidewalkMetrics")
-#analyze_area("seattle_crossing_tasks", "C:\\Development\\tdei\\OSWDataQC")
-#analyze_area("bellevue_crossing_tasks", "C:\\Development\\tdei\\OSWDataQC")
-#analyze_area("seattle_sidewalk_tasks", "C:\\Development\\tdei\\OSWDataQC")
-#analyze_area("bellevue_sidewalk_tasks", "C:\\Development\\tdei\\OSWDataQC")
+
+analyze_area("redmond_town_center", "C:\\Users\\jessb\\Downloads")
