@@ -10,9 +10,12 @@ from osmapi import OsmApi
 import geonetworkx as gnx
 from datetime import datetime
 import pandas as pd
+from shapely.ops import voronoi_diagram
+from shapely import MultiPoint
+import logging
 
 DATE = datetime.now() 
-PROJ = 'epsg:26910' 
+PROJ = 'epsg:26910'
 SIDEWALK_FILTER = '["highway"~"footway|steps|living_street|path"]'
 
 USERNAME = ""
@@ -29,16 +32,21 @@ def get_map_data(bounding_params):
     map_data = OSMAPICONNECTION.Map(min_lon=bounding_params[0],min_lat=bounding_params[1],max_lon=bounding_params[2],max_lat=bounding_params[3])
     return map_data
 
+def settings_init(settings):
+    if 'date' in settings.keys():
+        globals()['DATE'] = datetime.strptime(settings['date'], "%Y-%m-%dT%H:%M:%SZ")
+    if 'proj' in settings.keys():
+        globals()['PROJ'] = settings['proj']
+
 
 def get_item_history(item):
     '''Uses the OSM API to get the item history for any given node, way, or relation object.'''
     
     history = {}
-    print(item)
     if 'element_type' in item:
         item_type = item['element_type']
     else:
-        return None #TODO change this to be something else
+        return None
     id = item.get('osmid')
 
     if item_type == 'node':
@@ -55,54 +63,73 @@ def func( feature ):
     poly = feature.geometry
     if (poly.geom_type == "Polygon" or poly.geom_type == "MultiPolygon"):
         measures = get_measures_from_polygon(poly)
-        feature.degree = measures["deg_centrality_avg"]
-        feature.eigen = measures["eig_centrality_avg"]
-        feature.betweenness = measures["bet_centrality_avg"]
-        feature.bet_stdev = measures["bet_stdev"]
+        #feature.degree = measures["deg_centrality_avg"]
+        #feature.eigen = measures["eig_centrality_avg"]
+       # feature.betweenness = measures["bet_centrality_avg"]
+        #feature.bet_stdev = measures["bet_stdev"]
         feature.direct_trust_score = measures["direct_trust_score"]
         feature.time_trust_score = measures["time_trust_score"]
         feature.indirect_values = measures["indirect_values"]
         return feature
 
-def analyze_area(filename, path = 'pwd'):
+def analyze_area(filename, path = 'pwd', settings = {}):
     if path == 'pwd':
         path = os.getcwd()
+    
+    settings_init(settings)
+
+    logging_filename = path + "logs"
+    logging.basicConfig(filename=logging_filename,
+                    filemode='a',
+                    format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
+                    datefmt='%H:%M:%S',
+                    level=logging.DEBUG)
 
     gdf = gpd.read_file(os.path.join(path, (filename + '.geojson')))
-    gdf['degree'] = None
-    gdf['betweenness'] = None
-    gdf['eigen'] = None
-    gdf['bet_stdev'] = None
+    if len(gdf.index) == 1:
+        # If tiling isn't present in data, we will create our own tiling
+        gdf_roads_simplified = ox.graph.graph_from_polygon(gdf.geometry.loc[0], network_type = 'drive', simplify=True, retain_all=True)
+        gdf = create_voronoi_diagram(gdf_roads_simplified, gdf.geometry.loc[0])
+ 
+
+    #gdf['degree'] = None
+    #gdf['betweenness'] = None
+    #gdf['eigen'] = None
+    #gdf['bet_stdev'] = None
     gdf['direct_confirmations'] = None
     gdf['direct_trust_score'] = None
     gdf['time_trust_score'] = None
     gdf['indirect_values'] = None
+
+    df_dask = dask_geopandas.from_geopandas(gdf, npartitions=16, name = 'measures')
     
-    df_dask = dask_geopandas.from_geopandas(gdf, npartitions=16)  
+
     if __name__ == '__main__':
-        output = df_dask.apply(func, axis=1, meta=[
-            ('OBJECTID', 'int64'),
-            ('Shape_Length', 'float64'),
-            ('Shape_Area','float64'), 
-            ('Input_FID','int64'), 
-            ('geometry', 'geometry'),
-            ('degree','object'),
-            ('betweenness', 'object'), 
-            ('eigen', 'object'),
-            ('bet_stdev', 'object'),
-            ('direct_confirmations', 'object'),
-            ('direct_trust_score', 'object'),
-            ('time_trust_score', 'object'),
-            ('indirect_values', 'object')
-            ]).compute(scheduler='multiprocessing')
+        output = df_dask.apply(func, axis=1, meta=gpd.GeoDataFrame( {
+            'geometry': 'geometry',
+            #'degree':'object',
+            #'betweenness': 'object',
+            #'eigen': 'object',
+            #'bet_stdev': 'object',
+            'direct_confirmations': 'object',
+            'direct_trust_score': 'object',
+            'time_trust_score': 'object',
+            'indirect_values': 'object'}
+            , index=[0])).compute(scheduler='multiprocessing')
 
         threshhold_values = get_threshhold_values(output)
         output['indirect_trust_score'] = output.apply(lambda x: indirect_trust_calc(x, threshhold_values), axis=1)
         output['trust_score'] = output.apply(lambda x: trust_calc(x), axis=1)
-            # get indirect trust of each tile based on threshhold values
 
-        
-        output.to_file(os.path.join(path, (filename + '_trust_measures.shp')))
+        total_trust_score = output["trust_score"].mean()
+
+        ###remove below
+        final_output = output.drop("indirect_values", axis='columns')
+        final_output.to_file(os.path.join(path, (filename + '_trust_measures.shp')))
+        print(total_trust_score)
+        ###remove above
+
+        return total_trust_score
 
 def indirect_trust_calc(feature, threshholds):
     indirect_trust_score = 0
@@ -135,11 +162,12 @@ def get_measures_from_polygon(polygon):
     try:
         G = ox.graph.graph_from_polygon(polygon, custom_filter = SIDEWALK_FILTER, truncate_by_edge=True, simplify=False, retain_all=True)
     except ValueError as e:
-        print(f"Unexpected {e}, {type(e)} with polygon {polygon} when getting graph")
-        return {"bet_centrality_avg": None,"eig_centrality_avg": None,"deg_centrality_avg": None, "bet_stdev": None, "direct_trust_score": None, "time_trust_score": None, "indirect_values": None}
-    stats = get_centrality(G, polygon)
-    
+        logging.warning(f"Unexpected {e}, {type(e)} with polygon {polygon} when getting graph")
+        return {"direct_trust_score": None, "time_trust_score": None, "indirect_values": None}
+    #stats = get_centrality(G, polygon)
+    stats = {}
     direct_trust_score, time_trust_score = analyze_sidewalk_data(G)
+
     stats["direct_trust_score"] = direct_trust_score
     stats["time_trust_score"] = time_trust_score
 
@@ -154,19 +182,19 @@ def get_indirect_trust_score_from_polygon(polygon):
     try:
         gdf_pois = ox.features.features_from_polygon(polygon, tags = {'amenity': True}).to_crs({'init': PROJ})
     except ValueError as e:
-        print(f"Unexpected {e}, {type(e)} with polygon {polygon} when getting graph")
-        gdf_pois = gpd.GeoDataFrame(columns=['id', 'distance', 'feature'], geometry='feature')
+        logging.warning(f"Unexpected {e}, {type(e)} with polygon {polygon} when getting graph")
+        gdf_pois = gpd.GeoDataFrame(columns=['amenity', 'operator', 'nodes', 'geometry'], geometry='geometry')
     try:
         gdf_bldgs = ox.features.features_from_polygon(polygon, tags = {'building': True}).to_crs({'init': PROJ})
     except ValueError as e:
-        print(f"Unexpected {e}, {type(e)} with polygon {polygon} when getting graph")
-        gdf_bldgs = gpd.GeoDataFrame(columns=['id', 'distance', 'feature'], geometry='feature')
+        logging.warning(f"Unexpected {e}, {type(e)} with polygon {polygon} when getting graph")
+        gdf_bldgs = gpd.GeoDataFrame(columns=['geometry', 'amenity', 'nodes'], geometry='geometry')
     try:
         G_roads = ox.graph.graph_from_polygon(polygon, network_type = 'drive', simplify=False, retain_all=True)
         gdf_roads = gnx.graph_edges_to_gdf(G_roads).to_crs({'init': PROJ})
     except ValueError as e:
-        print(f"Unexpected {e}, {type(e)} with polygon {polygon} when getting graph")
-        gdf_roads = gpd.GeoDataFrame(columns=['id', 'distance', 'feature'], geometry='feature') #TODO: change column names
+        logging.warning(f"Unexpected {e}, {type(e)} with polygon {polygon} when getting graph")
+        gdf_roads = gpd.GeoDataFrame(columns=['u', 'v', 'osmid', 'highway', 'reversed', 'length', 'geometry', 'lanes', 'name', 'maxspeed', 'bridge', 'ref'], geometry='geometry') 
     
     values_dict = {
         "poi_count": len(gdf_pois.index),
@@ -199,7 +227,6 @@ def filter_through_items_for_stats(gdf):
         user_count_array.append(user_count)
         days_since_last_edit_array.append(days_since_last_edit)
     if user_count_array and len(user_count_array) != 0:
-        print(user_count_array)
         mean_user_count_array = mean(user_count_array)
     if days_since_last_edit_array and len(days_since_last_edit_array) != 0:
         try:
@@ -219,7 +246,7 @@ def get_centrality(G, polygon):
         eigen = nx.eigenvector_centrality(undirected_g, max_iter=1000)
         stats["eig_centrality_avg"] = mean(eigen.values())
     except Exception as e:
-        print(f"Unexpected {e}, {type(e)} with polygon {polygon} when getting eigen value")
+        logging.warning(f"Unexpected {e}, {type(e)} with polygon {polygon} when getting eigen value")
         stats["eig_centrality_avg"] = None
 
     deg = nx.degree_centrality(undirected_g)
@@ -453,7 +480,7 @@ def calculate_total_trust_score(gdf):
         time_trust_score = output['time_trust_score'].mean()
         return direct_trust_score, time_trust_score
     else:
-        print("direct trust calc failed")
+        logging.error("direct trust calc failed")
         return 0
 
 def trust_score_calc(feature, versions_threshold, direct_confirm_threshold, changes_to_tags_threshold, 
@@ -479,8 +506,18 @@ def trust_score_calc(feature, versions_threshold, direct_confirm_threshold, chan
 
     return feature
 
+def create_voronoi_diagram(G_roads_simplified, bounds):
+    # first thin the nodes 
+    gdf_roads_simplified = gnx.graph_edges_to_gdf(G_roads_simplified)
+    voronoi = voronoi_diagram(gdf_roads_simplified.boundary.unary_union, envelope = bounds)
+    voronoi_gdf = gpd.GeoDataFrame({"geometry": voronoi.geoms})
+    #voronoi_gdf.set_crs(PROJ)
+    voronoi_gdf.to_file(os.path.join("C:\\Users\\jessb\\OneDrive\\Email attachments\\Documents\\wokr\\redmond", ('tiling_test2.shp')))
+    return voronoi_gdf
 
-analyze_area("redmond_new_tiling_subset","C:\\Users\\jessb\\OneDrive\\Email attachments\\Documents\\wokr\\redmond")
+
+#analyze_area("redmond_town_center","C:\\Users\\jessb\\OneDrive\\Email attachments\\Documents\\wokr\\redmond")
+analyze_area("seattle_downtown", "C:\\Users\\jessb\\Downloads")
 #analyze_area("seattle_new_tiling","C:\\Users\\jessica\\Documents\\ArcGIS\\Projects\\MappingSidewalkMetrics")
 #analyze_area("seattle_crossing_tasks", "C:\\Development\\tdei\\OSWDataQC")
 #analyze_area("bellevue_crossing_tasks", "C:\\Development\\tdei\\OSWDataQC")
